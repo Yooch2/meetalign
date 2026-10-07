@@ -243,8 +243,19 @@
   document.addEventListener("submit", function (e) {
     var form = e.target;
     if (!(form instanceof HTMLFormElement)) return;
+    var submitter = e.submitter;
     form.querySelectorAll('button[type="submit"], button:not([type])').forEach(function (btn) {
       if (btn.disabled) return;
+      // 버튼을 비활성화하면 브라우저가 그 버튼의 name/value를 제출 데이터에서 빼버린다
+      // (disabled 요소는 폼 데이터에서 제외됨). 클릭된 버튼(submitter)이라면 같은
+      // name/value를 가진 hidden input으로 미리 남겨둬서 서버가 받는 값이 바뀌지 않게 한다.
+      if (btn === submitter && btn.name) {
+        var hidden = document.createElement("input");
+        hidden.type = "hidden";
+        hidden.name = btn.name;
+        hidden.value = btn.value;
+        form.appendChild(hidden);
+      }
       btn.disabled = true;
       btn.dataset.originalHtml = btn.innerHTML;
       btn.innerHTML = '<span class="spinner" style="border-color:currentColor;border-top-color:transparent;opacity:.85"></span> 처리 중...';
