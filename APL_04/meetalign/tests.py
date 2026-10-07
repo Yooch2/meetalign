@@ -500,6 +500,14 @@ class SemanticDiscrepancyTests(TestCase):
             r = self.client.get(reverse("verification", args=[self.meeting.id]))
         self.assertContains(r, "엇갈린 답변이 없습니다.")
 
+    def test_progress_bar_shows_answer_completion(self):
+        Answer.objects.create(question=self.question, user=self.user, text="이메일")
+        r = self.client.get(reverse("verification", args=[self.meeting.id]))
+        self.assertEqual(r.context["answered_slots"], 1)
+        self.assertEqual(r.context["total_slots"], 2)
+        self.assertEqual(r.context["progress_pct"], 50)
+        self.assertContains(r, "1 / 2")
+
 
 class QuestionTimingTests(TestCase):
     def setUp(self):

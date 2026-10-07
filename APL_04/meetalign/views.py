@@ -252,16 +252,23 @@ def understanding(request, meeting_id):
 def verification(request, meeting_id):
     meeting = _meeting(request, meeting_id)
     members = list(meeting.team.members.all())
+    questions = list(meeting.check_questions.all())
     pending = []
-    for question in meeting.check_questions.all():
+    answered_slots = 0
+    for question in questions:
         answered = set(question.answers.values_list("user_id", flat=True))
         missing = [member for member in members if member.id not in answered]
+        answered_slots += len(members) - len(missing)
         if missing:
             pending.append((question, missing))
+    total_slots = len(members) * len(questions)
     return render(request, "meetalign/verification.html", {
         "meeting": meeting,
         "discrepancies": _find_discrepancies(meeting),
         "pending": pending,
+        "answered_slots": answered_slots,
+        "total_slots": total_slots,
+        "progress_pct": round(answered_slots * 100 / total_slots) if total_slots else 0,
     })
 
 

@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script>(function(){try{var t=localStorage.getItem("theme");if(!t)t=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
 <title>{% block title %}MeetAlign{% endblock %}</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='2' y='3' width='14' height='14' rx='5' fill='%230f766e'/%3E%3Crect x='8' y='7' width='14' height='14' rx='5' fill='%23ea580c' fill-opacity='.88'/%3E%3C/svg%3E">
 <meta name="description" content="회의 녹음으로 회의록을 만들고, 팀원 간 이해 차이를 짚어주는 서비스">
@@ -20,9 +21,21 @@
     --radius-sm:9px; --radius:14px; --radius-lg:20px;
     --shadow-sm:0 1px 2px rgba(28,25,23,.05);
     --shadow:0 10px 30px -14px rgba(28,25,23,.18), 0 2px 6px rgba(28,25,23,.05);
+    --topbar-bg:rgba(251,248,243,.85);
     --font: "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
   }
-  * { box-sizing:border-box; }
+  :root[data-theme="dark"] {
+    --ink:#f2efe9; --ink-soft:#d6d1c7; --muted:#9a9186; --line:#36322b; --line-strong:#49443b;
+    --bg:#17150f; --surface:#211e18; --surface-sunken:#191712;
+    --brand:#2dd4bf; --brand-ink:#0b1f1c; --brand-dark:#14b8a6; --brand-soft:#15302c;
+    --accent:#fb923c; --accent-soft:#3a2614;
+    --danger:#f87171; --danger-soft:#3a1e1c;
+    --success:#4ade80; --success-soft:#15301f;
+    --shadow-sm:0 1px 2px rgba(0,0,0,.3);
+    --shadow:0 14px 34px -14px rgba(0,0,0,.6), 0 2px 8px rgba(0,0,0,.35);
+    --topbar-bg:rgba(23,21,15,.85);
+  }
+  * { box-sizing:border-box; transition:background-color .25s ease, border-color .25s ease, color .25s ease; }
   html { background:var(--bg); }
   body {
     margin:0; font-family:var(--font); color:var(--ink); background:var(--bg);
@@ -41,7 +54,7 @@
   /* ---- Top bar ---- */
   header.topbar {
     position:sticky; top:0; z-index:10; display:flex; align-items:center; justify-content:space-between;
-    gap:12px; padding:14px 28px; background:rgba(251,248,243,.85); backdrop-filter:blur(10px);
+    gap:12px; padding:14px 28px; background:var(--topbar-bg); backdrop-filter:blur(10px);
     border-bottom:1px solid var(--line);
   }
   header.topbar nav { display:flex; gap:18px; align-items:center; font-size:.92rem; color:var(--ink-soft); }
@@ -55,6 +68,15 @@
   }
   header.topbar nav a { color:var(--muted); font-weight:600; }
   header.topbar nav a:hover { color:var(--ink); }
+
+  #theme-toggle {
+    display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px;
+    padding:0; border:1px solid var(--line); border-radius:50%; background:var(--surface); color:var(--ink-soft);
+    cursor:pointer;
+  }
+  #theme-toggle:hover { background:var(--surface-sunken); filter:none; }
+  :root[data-theme="light"] #theme-toggle .sun { display:none; }
+  :root[data-theme="dark"] #theme-toggle .moon { display:none; }
 
   main.container { max-width:800px; margin:0 auto; padding:40px 20px 64px; }
   main.container.wide { max-width:880px; }
@@ -125,6 +147,9 @@
     background:var(--success-soft); color:var(--success); border:1px solid #bfe6cd;
     padding:13px 16px; border-radius:var(--radius-sm); margin:14px 0; font-size:.92rem;
   }
+  :root[data-theme="dark"] .notice { color:#ffd8ad; border-color:#5a3418; }
+  :root[data-theme="dark"] .error { border-color:#5a2b27; }
+  :root[data-theme="dark"] .success { border-color:#235c37; }
 
   .field { display:flex; flex-direction:column; gap:7px; margin:16px 0; }
   .field label, .field > span.label { font-size:.86rem; font-weight:700; color:var(--ink-soft); }
@@ -191,8 +216,33 @@
   }
   @keyframes spin { to { transform:rotate(360deg); } }
 
+  /* ---- Motion ---- */
+  @keyframes fadeInUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+  .card.elevated, .hero, .auth-shell { animation:fadeInUp .5s cubic-bezier(.16,1,.3,1) both; }
+  @media (prefers-reduced-motion: reduce) {
+    .card.elevated, .hero, .auth-shell { animation:none; }
+  }
+
+  /* ---- Progress bar ---- */
+  .progress-track {
+    width:100%; height:8px; border-radius:999px; background:var(--surface-sunken);
+    overflow:hidden; border:1px solid var(--line);
+  }
+  .progress-fill {
+    height:100%; border-radius:999px; background:linear-gradient(90deg, var(--brand), var(--brand-dark));
+    transition:width .5s cubic-bezier(.16,1,.3,1);
+  }
+  .progress-row { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px; font-size:.86rem; color:var(--ink-soft); font-weight:600; }
+
   /* ---- Hero (logged-out landing) ---- */
-  .hero { max-width:640px; margin:70px auto; text-align:center; padding:0 20px; }
+  .hero { max-width:640px; margin:70px auto; text-align:center; padding:0 20px; position:relative; }
+  .hero::before {
+    content:""; position:absolute; z-index:-1; inset:-60px -40px auto -40px; height:360px; pointer-events:none;
+    background:radial-gradient(circle at 28% 35%, var(--brand) 0%, transparent 60%),
+               radial-gradient(circle at 72% 55%, var(--accent) 0%, transparent 55%);
+    opacity:.16; filter:blur(60px);
+  }
+  :root[data-theme="dark"] .hero::before { opacity:.3; }
   .hero .mark { margin:0 auto 22px; }
   .hero h1 { font-size:2.1rem; line-height:1.25; }
   .hero p.lede { color:var(--muted); font-size:1.05rem; margin-top:14px; }
@@ -200,7 +250,16 @@
 
   /* ---- Auth split layout ---- */
   .auth-shell { max-width:860px; margin:48px auto; display:grid; grid-template-columns:1.05fr 1fr; border-radius:var(--radius-lg); overflow:hidden; box-shadow:var(--shadow); }
-  .auth-panel { background:linear-gradient(160deg, var(--brand) 0%, var(--brand-dark) 100%); color:#fff; padding:44px 38px; display:flex; flex-direction:column; justify-content:space-between; }
+  .auth-panel {
+    position:relative; overflow:hidden; background:linear-gradient(160deg, var(--brand) 0%, var(--brand-dark) 100%);
+    color:#fff; padding:44px 38px; display:flex; flex-direction:column; justify-content:space-between;
+  }
+  .auth-panel::before, .auth-panel::after {
+    content:""; position:absolute; border-radius:50%; filter:blur(50px); pointer-events:none;
+  }
+  .auth-panel::before { width:280px; height:280px; background:var(--accent); opacity:.35; top:-90px; right:-90px; }
+  .auth-panel::after { width:220px; height:220px; background:#fff; opacity:.12; bottom:-70px; left:-50px; }
+  .auth-panel > * { position:relative; z-index:1; }
   .auth-panel .brand-wordmark { color:#fff; }
   .auth-panel h2 { font-size:1.35rem; line-height:1.4; margin-top:26px; }
   .auth-panel p { color:rgba(255,255,255,.82); font-size:.92rem; }
@@ -231,6 +290,10 @@
     <span class="brand-wordmark">MeetAlign</span>
   </a>
   <nav>
+    <button type="button" id="theme-toggle" aria-label="다크 모드 전환">
+      <svg class="sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/></svg>
+      <svg class="moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 14.5A8.5 8.5 0 1 1 9.5 3.5a7 7 0 0 0 11 11Z"/></svg>
+    </button>
     {% if user.is_authenticated %}
       <span class="user-chip"><span class="dot">{{ user.username|slice:":1"|upper }}</span>{{ user.username }}</span>
       <a href="{% url 'logout' %}">로그아웃</a>
@@ -288,6 +351,14 @@
     if (!input) return;
     input.type = input.type === "password" ? "text" : "password";
     btn.classList.toggle("on", input.type === "text");
+  });
+
+  document.addEventListener("click", function (e) {
+    if (!e.target.closest("#theme-toggle")) return;
+    var current = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+    var next = current === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    try { localStorage.setItem("theme", next); } catch (err) {}
   });
 </script>
 </body>
