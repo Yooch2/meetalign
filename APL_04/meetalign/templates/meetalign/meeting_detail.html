@@ -100,4 +100,13 @@
     <a class="btn sm secondary" href="{% url 'understanding' meeting.id %}">답하기</a>
   </li>
 </ul>
+{% if meeting.host_id == user.id %}
+<form method="post" style="margin-top:28px">{% csrf_token %}
+  <button name="action" value="delete_meeting" class="btn ghost" style="color:var(--danger)"
+    onclick="return confirm('회의 \'{{ meeting.title }}\'를 삭제할까요? 녹음, 회의록, 답변이 모두 함께 삭제되며 되돌릴 수 없습니다.');">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0-1 14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2L4 6"/></svg>
+    회의 삭제
+  </button>
+</form>
+{% endif %}
 {% endblock %}

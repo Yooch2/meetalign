@@ -717,3 +717,53 @@ class MultipleRecordingsTests(TestCase):
         self.meeting.refresh_from_db()
         self.assertEqual(self.meeting.transcript, "좋은 전사")
         self.assertEqual(self.meeting.processing_status, Meeting.STATUS_DONE)
+
+
+class DeleteTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user("a", password="pw12345!")
+        self.other = User.objects.create_user("b", password="pw12345!")
+        self.client.force_login(self.user)
+        self.team = Team.objects.create(name="t", created_by=self.user)
+        self.team.members.add(self.user, self.other)
+        self.meeting = Meeting.objects.create(team=self.team, title="m", host=self.user)
+
+    def test_host_can_delete_meeting(self):
+        r = self.client.post(reverse("meeting_detail", args=[self.meeting.id]), {"action": "delete_meeting"})
+        self.assertRedirects(r, reverse("meeting_list", args=[self.team.id]))
+        self.assertFalse(Meeting.objects.filter(pk=self.meeting.id).exists())
+
+    def test_non_host_cannot_delete_meeting(self):
+        client = Client()
+        client.force_login(self.other)
+        r = client.post(reverse("meeting_detail", args=[self.meeting.id]), {"action": "delete_meeting"})
+        self.assertEqual(r.status_code, 403)
+        self.assertTrue(Meeting.objects.filter(pk=self.meeting.id).exists())
+
+    def test_creator_can_delete_team(self):
+        r = self.client.post(reverse("meeting_list", args=[self.team.id]), {"action": "delete_team"})
+        self.assertRedirects(r, reverse("index"))
+        self.assertFalse(Team.objects.filter(pk=self.team.id).exists())
+
+    def test_non_creator_member_cannot_delete_team(self):
+        client = Client()
+        client.force_login(self.other)
+        r = client.post(reverse("meeting_list", args=[self.team.id]), {"action": "delete_team"})
+        self.assertEqual(r.status_code, 403)
+        self.assertTrue(Team.objects.filter(pk=self.team.id).exists())
+
+    def test_meeting_list_shows_delete_button_only_to_creator(self):
+        r = self.client.get(reverse("meeting_list", args=[self.team.id]))
+        self.assertContains(r, "팀 삭제")
+        client = Client()
+        client.force_login(self.other)
+        r = client.get(reverse("meeting_list", args=[self.team.id]))
+        self.assertNotContains(r, "팀 삭제")
+
+    def test_meeting_detail_shows_delete_button_only_to_host(self):
+        r = self.client.get(reverse("meeting_detail", args=[self.meeting.id]))
+        self.assertContains(r, "회의 삭제")
+        client = Client()
+        client.force_login(self.other)
+        r = client.get(reverse("meeting_detail", args=[self.meeting.id]))
+        self.assertNotContains(r, "회의 삭제")

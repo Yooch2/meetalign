@@ -66,7 +66,8 @@ def team_join(request):
             if not name or Team.objects.filter(name=name).exists():
                 error = "팀 이름이 비었거나 이미 존재합니다."
             else:
-                Team.objects.create(name=name).members.add(request.user)
+                team = Team.objects.create(name=name, created_by=request.user)
+                team.members.add(request.user)
                 return redirect("index")
         else:
             team = Team.objects.filter(name=name).first()
@@ -89,6 +90,11 @@ def _meeting(request, meeting_id):
 @login_required
 def meeting_list(request, team_id):
     team = _team(request, team_id)
+    if request.method == "POST" and request.POST.get("action") == "delete_team":
+        if team.created_by_id != request.user.id:
+            raise PermissionDenied
+        team.delete()
+        return redirect("index")
     return render(request, "meetalign/meeting_list.html", {"team": team, "meetings": team.meetings.all()})
 
 
@@ -130,6 +136,12 @@ def meeting_detail(request, meeting_id):
     error = None
     if request.method == "POST":
         recording = request.FILES.get("recording")
+        if request.POST.get("action") == "delete_meeting":
+            if meeting.host_id != request.user.id:
+                raise PermissionDenied
+            team_id = meeting.team_id
+            meeting.delete()
+            return redirect("meeting_list", team_id=team_id)
         if recording and meeting.ended:
             error = "종료된 회의에는 녹음을 올릴 수 없습니다."
         elif recording:

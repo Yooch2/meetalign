@@ -228,5 +228,17 @@
   </details>
   {% block content %}{% endblock %}
 </main>
+<script>
+  document.addEventListener("submit", function (e) {
+    var form = e.target;
+    if (!(form instanceof HTMLFormElement)) return;
+    form.querySelectorAll('button[type="submit"], button:not([type])').forEach(function (btn) {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      btn.dataset.originalHtml = btn.innerHTML;
+      btn.innerHTML = '<span class="spinner" style="border-color:currentColor;border-top-color:transparent;opacity:.85"></span> 처리 중...';
+    });
+  }, true);
+</script>
 </body>
 </html>
