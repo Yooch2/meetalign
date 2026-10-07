@@ -7,11 +7,12 @@ from django.http import FileResponse, Http404, HttpResponse
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils.dateparse import parse_date
 from django.utils.http import url_has_allowed_host_and_scheme
 
 from . import services, tasks
-from .models import Answer, CheckQuestion, Meeting, Question, Recording, Team
+from .models import Answer, ChatMessage, CheckQuestion, Meeting, Question, Recording, Team
 
 ALLOWED_RECORDING_EXTENSIONS = {".mp3", ".m4a", ".wav", ".ogg", ".webm", ".mp4", ".flac"}
 MAX_RECORDING_BYTES = 500 * 1024 * 1024
@@ -178,11 +179,13 @@ def recording_retry(request, meeting_id, recording_id):
     return redirect("meeting_result", meeting_id=meeting.id)
 
 
+CHAT_HISTORY_TURNS = 3
+
+
 @login_required
 def chat(request, meeting_id):
     meeting = _meeting(request, meeting_id)
     mode = request.POST.get("mode") or request.GET.get("mode", "llm")
-    reply = ""
     error = None
     if request.method == "POST" and request.POST.get("text", "").strip():
         text = request.POST["text"].strip()
@@ -192,8 +195,19 @@ def chat(request, meeting_id):
             else:
                 Question.objects.create(meeting=meeting, text=text)
         else:
-            reply = services.chat_reply(meeting, text)
-    return render(request, "meetalign/chat.html", {"meeting": meeting, "mode": mode, "reply": reply, "error": error})
+            history = list(
+                ChatMessage.objects.filter(meeting=meeting, user=request.user)
+                .order_by("-created_at")[: CHAT_HISTORY_TURNS * 2]
+                .values_list("role", "text")
+            )[::-1]
+            ChatMessage.objects.create(meeting=meeting, user=request.user, role=ChatMessage.ROLE_USER, text=text)
+            reply = services.chat_reply(meeting, text, history=history)
+            ChatMessage.objects.create(meeting=meeting, user=request.user, role=ChatMessage.ROLE_ASSISTANT, text=reply)
+            return redirect("%s?mode=llm" % reverse("chat", args=[meeting.id]))
+    messages = []
+    if mode != "anon":
+        messages = ChatMessage.objects.filter(meeting=meeting, user=request.user)
+    return render(request, "meetalign/chat.html", {"meeting": meeting, "mode": mode, "messages": messages, "error": error})
 
 
 def _require_host(meeting, user):

@@ -72,6 +72,25 @@ class Recording(models.Model):
         return self.filename
 
 
+class ChatMessage(models.Model):
+    """회의 내용에 대해 질문하는 대화창의 기록. 사용자별로 따로 저장되어
+    다음 질문을 할 때 이전 대화를 참고할 수 있게 한다. 익명 질문함(Question)과는 별개다."""
+    ROLE_USER = "user"
+    ROLE_ASSISTANT = "assistant"
+
+    meeting = models.ForeignKey(Meeting, on_delete=models.CASCADE, related_name="chat_messages")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="chat_messages")
+    role = models.CharField(max_length=10, choices=[(ROLE_USER, "user"), (ROLE_ASSISTANT, "assistant")])
+    text = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+
+    def __str__(self):
+        return "%s(%s): %s" % (self.user, self.role, self.text[:30])
+
+
 class Question(models.Model):
     """회의별 대화방의 익명 질문. 작성자는 저장하지 않는다."""
     meeting = models.ForeignKey(Meeting, on_delete=models.CASCADE, related_name="questions")

@@ -13,7 +13,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from . import services, tasks, views
-from .models import Answer, CheckQuestion, Meeting, Question, Recording, Team
+from .models import Answer, ChatMessage, CheckQuestion, Meeting, Question, Recording, Team
 
 
 class AuthTests(TestCase):
@@ -143,10 +143,18 @@ class PrototypeFlowTests(TestCase):
         q.refresh_from_db()
         self.assertEqual(q.answer, "because")
 
-    def test_llm_chat_does_not_store(self):
-        r = self.client.post(reverse("chat", args=[self.meeting.id]), {"mode": "llm", "text": "hi"})
+    def test_llm_chat_does_not_touch_anon_questions(self):
+        r = self.client.post(reverse("chat", args=[self.meeting.id]), {"mode": "llm", "text": "hi"}, follow=True)
         self.assertContains(r, "가짜 LLM")
         self.assertEqual(Question.objects.count(), 0)
+
+    def test_llm_chat_stores_conversation_per_user(self):
+        self.client.post(reverse("chat", args=[self.meeting.id]), {"mode": "llm", "text": "hi"})
+        messages = list(ChatMessage.objects.filter(meeting=self.meeting, user=self.user))
+        self.assertEqual(len(messages), 2)
+        self.assertEqual(messages[0].role, ChatMessage.ROLE_USER)
+        self.assertEqual(messages[0].text, "hi")
+        self.assertEqual(messages[1].role, ChatMessage.ROLE_ASSISTANT)
 
     def test_meeting_detail_back_link(self):
         r = self.client.get(reverse("meeting_detail", args=[self.meeting.id]))
@@ -259,6 +267,22 @@ class PrototypeFlowTests(TestCase):
         member.post(reverse("chat", args=[self.meeting.id]), {"mode": "anon", "text": "hi"})
         self.assertEqual(Question.objects.filter(meeting=self.meeting).count(), 1)
 
+    def test_chat_conversation_is_isolated_per_user(self):
+        member = self._member_client()
+        self.client.post(reverse("chat", args=[self.meeting.id]), {"mode": "llm", "text": "내 질문"})
+        member.post(reverse("chat", args=[self.meeting.id]), {"mode": "llm", "text": "다른 사람 질문"})
+        r = self.client.get(reverse("chat", args=[self.meeting.id]))
+        self.assertContains(r, "내 질문")
+        self.assertNotContains(r, "다른 사람 질문")
+
+    def test_second_chat_turn_includes_first_turn_as_history(self):
+        with patch.dict(os.environ, {"OLLAMA_MODEL": "m1"}), patch.object(services, "_generate", return_value="답1"):
+            self.client.post(reverse("chat", args=[self.meeting.id]), {"mode": "llm", "text": "질문1"})
+        with patch.dict(os.environ, {"OLLAMA_MODEL": "m1"}), patch.object(services, "chat_reply") as reply:
+            reply.return_value = "답2"
+            self.client.post(reverse("chat", args=[self.meeting.id]), {"mode": "llm", "text": "질문2"})
+        self.assertEqual(reply.call_args.kwargs["history"], [("user", "질문1"), ("assistant", "답1")])
+
 
 class LocalLLMTests(TestCase):
     def setUp(self):
@@ -278,6 +302,19 @@ class LocalLLMTests(TestCase):
         self.assertEqual(reply, "A안입니다")
         self.assertIn("결정: A안으로 진행", gen.call_args[0][0])
         self.assertIn("무엇을 정했나?", gen.call_args[0][0])
+
+    def test_chat_reply_includes_conversation_history(self):
+        history = [("user", "언제까지야?"), ("assistant", "다음 주 금요일입니다.")]
+        with patch.dict(os.environ, {"OLLAMA_MODEL": "m1"}), patch.object(services, "_generate", return_value="네 맞습니다") as gen:
+            services.chat_reply(self.meeting, "확실해?", history=history)
+        prompt = gen.call_args[0][0]
+        self.assertIn("언제까지야?", prompt)
+        self.assertIn("다음 주 금요일입니다.", prompt)
+
+    def test_chat_reply_without_history_has_no_history_section(self):
+        with patch.dict(os.environ, {"OLLAMA_MODEL": "m1"}), patch.object(services, "_generate", return_value="답") as gen:
+            services.chat_reply(self.meeting, "q")
+        self.assertNotIn("이전 대화", gen.call_args[0][0])
 
     def test_check_questions_from_llm_lines(self):
         with patch.dict(os.environ, {"OLLAMA_MODEL": "m1"}), patch.object(services, "_generate", return_value="질문1\n\n질문2\n질문3"):

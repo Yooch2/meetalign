@@ -96,12 +96,16 @@ def summarize(transcript):
     return result if result is not None else transcript
 
 
-def chat_reply(meeting, text):
+def chat_reply(meeting, text, history=None):
     if not (_enabled() and meeting.record):
         return "(가짜 LLM 응답) '%s'에 대한 답변입니다." % text
+    history_block = ""
+    if history:
+        lines = ["%s: %s" % ("나" if role == "user" else "AI", msg) for role, msg in history]
+        history_block = "\n\n이전 대화 (참고해서 자연스럽게 이어서 답하라):\n" + "\n".join(lines)
     prompt = (
         "아래 회의록 내용만 근거로 질문에 답하라. 반드시 한국어로만 답하고 다른 언어를 섞지 마라. 회의록에 없는 내용이면 '회의록에 없는 내용입니다'라고 답하라.\n\n"
-        "회의록:\n" + meeting.record + "\n\n질문: " + text
+        "회의록:\n" + meeting.record + history_block + "\n\n질문: " + text
     )
     try:
         result = _generate_clean(prompt)

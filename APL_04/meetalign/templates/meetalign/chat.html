@@ -1,6 +1,6 @@
 {% extends "meetalign/base.html" %}
 {% block note %}
-<li>회의마다 대화방이 있으며, 프로젝트 맥락은 각 회의 결과로만 유지한다 (대화 기록은 저장하지 않음).</li>
+<li>회의 내용 질문 대화는 사용자별로 저장되어, 다음 질문을 할 때 이전 대화를 참고해 답한다.</li>
 <li>익명 질문은 작성자를 저장하지 않는다. 로컬 LLM이 꺼져 있으면 가짜 응답이 나온다.</li>
 {% endblock %}
 {% block content %}
@@ -26,7 +26,21 @@
       <button>보내기</button>
     </div>
   </form>
-  {% if reply %}<div class="bubble">{{ reply }}</div>{% endif %}
+  {% if mode != "anon" %}
+    {% if messages %}
+    <div style="margin-top:16px;display:flex;flex-direction:column;gap:10px">
+      {% for msg in messages %}
+        {% if msg.role == "user" %}
+          <div class="muted" style="align-self:flex-end;max-width:85%;text-align:right"><b style="color:var(--ink)">나:</b> {{ msg.text }}</div>
+        {% else %}
+          <div class="bubble" style="align-self:flex-start;max-width:85%;margin-top:0">{{ msg.text }}</div>
+        {% endif %}
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty" style="margin-top:16px"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-8.9 8.4 8.6 8.6 0 0 1-3.7-.8L3 20l1-5a8.5 8.5 0 0 1-1-4.1A8.4 8.4 0 0 1 11.9 2a8.4 8.4 0 0 1 9 8.4Z"/></svg>아직 대화가 없습니다. 회의 내용에 대해 물어보세요.</div>
+    {% endif %}
+  {% endif %}
   {% if mode == "anon" and request.method == "POST" and not error %}<div class="success" style="margin-top:12px">익명 질문이 전송되었습니다.</div>{% endif %}
   <p style="margin-top:18px"><a href="{% url 'inbox' meeting.id %}">익명 질문 받는 화면 (주최자)</a></p>
 </div>

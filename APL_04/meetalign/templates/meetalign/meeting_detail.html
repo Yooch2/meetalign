@@ -52,7 +52,7 @@
             <a class="btn sm secondary" href="{% url 'recording_file' meeting.id rec.id %}">받기</a>
           </div>
         </div>
-        <audio controls preload="none" style="width:100%;height:36px" src="{% url 'recording_file' meeting.id rec.id %}"></audio>
+        <audio controls preload="metadata" style="width:100%;height:36px" src="{% url 'recording_file' meeting.id rec.id %}"></audio>
       </li>
     {% endfor %}
     </ul>
