@@ -115,6 +115,15 @@ class PrototypeFlowTests(TestCase):
         self.meeting.refresh_from_db()
         self.assertIn("test", Recording.objects.get(meeting=self.meeting).file.name)
 
+    def test_meeting_detail_has_inline_audio_player_for_recording(self):
+        self.client.post(reverse("meeting_detail", args=[self.meeting.id]), {
+            "action": "submit", "recording": SimpleUploadedFile("test.mp3", b"fake audio bytes", content_type="audio/mpeg"),
+        })
+        rec = Recording.objects.get(meeting=self.meeting)
+        r = self.client.get(reverse("meeting_detail", args=[self.meeting.id]))
+        self.assertContains(r, "<audio")
+        self.assertContains(r, reverse("recording_file", args=[self.meeting.id, rec.id]))
+
     def test_summary_shows_saved_record(self):
         self.meeting.record = "결정: A안으로 진행"
         self.meeting.save()
@@ -285,6 +294,22 @@ class LocalLLMTests(TestCase):
         with patch.dict(os.environ, {"OLLAMA_MODEL": "m1"}), patch.object(services, "_generate") as gen:
             self.assertEqual(services.check_questions(self.meeting), services.FAKE_CHECK_QUESTIONS)
         gen.assert_not_called()
+
+    def test_question_count_scales_with_record_bullet_count(self):
+        self.assertEqual(services._question_count_for("안건만 있고 불릿 없음"), 2)
+        self.assertEqual(services._question_count_for("- a\n- b\n- c\n- d"), 2)
+        self.assertEqual(services._question_count_for("\n".join(["- x"] * 10)), 5)
+        self.assertEqual(services._question_count_for("\n".join(["- x"] * 6)), 3)
+
+    def test_longer_record_requests_more_questions_from_llm(self):
+        self.meeting.record = "[결정 사항]\n" + "\n".join("- 항목%d" % i for i in range(10))
+        self.meeting.save()
+        with patch.dict(os.environ, {"OLLAMA_MODEL": "m1"}), patch.object(
+            services, "_generate", return_value="\n".join("질문%d" % i for i in range(5))
+        ) as gen:
+            result = services.check_questions(self.meeting)
+        self.assertEqual(len(result), 5)
+        self.assertIn("정확히 5개", gen.call_args[0][0])
 
 
 class LanguageFilterTests(TestCase):
@@ -808,6 +833,20 @@ class FollowupTests(TestCase):
         r = self.client.get(reverse("verification", args=[self.meeting.id]))
         self.assertContains(r, "아직 답하지 않은 팀원")
         self.assertContains(r, "b")
+
+    def test_reminder_text_lists_pending_usernames(self):
+        CheckQuestion.objects.create(meeting=self.meeting, text="Q", order=0)
+        r = self.client.get(reverse("verification", args=[self.meeting.id]))
+        self.assertIn("a, b", r.context["reminder_text"])
+        self.assertContains(r, "복사해서 알리기")
+
+    def test_no_reminder_button_when_everyone_answered(self):
+        question = CheckQuestion.objects.create(meeting=self.meeting, text="Q", order=0)
+        Answer.objects.create(question=question, user=self.user, text="답1")
+        Answer.objects.create(question=question, user=self.other, text="답2")
+        r = self.client.get(reverse("verification", args=[self.meeting.id]))
+        self.assertEqual(r.context["reminder_text"], "")
+        self.assertNotContains(r, "복사해서 알리기")
 
     def test_second_upload_keeps_the_first_recording(self):
         self.client.post(reverse("meeting_detail", args=[self.meeting.id]), {"action": "submit", "recording": SimpleUploadedFile("a.wav", b"RIFF1")})

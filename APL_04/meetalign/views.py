@@ -274,10 +274,17 @@ def verification(request, meeting_id):
         if missing:
             pending.append((question, missing))
     total_slots = len(members) * len(questions)
+    pending_usernames = sorted({member.username for _, missing in pending for member in missing})
+    reminder_text = ""
+    if pending_usernames:
+        reminder_text = "[%s] 이해도 질문에 아직 답변 안 하신 분: %s — 확인 부탁드려요!" % (
+            meeting.title, ", ".join(pending_usernames),
+        )
     return render(request, "meetalign/verification.html", {
         "meeting": meeting,
         "discrepancies": _find_discrepancies(meeting),
         "pending": pending,
+        "reminder_text": reminder_text,
         "answered_slots": answered_slots,
         "total_slots": total_slots,
         "progress_pct": round(answered_slots * 100 / total_slots) if total_slots else 0,

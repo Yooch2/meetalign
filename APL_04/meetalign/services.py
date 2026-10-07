@@ -56,12 +56,21 @@ def _generate_clean(prompt, retries=1):
     return None
 
 
+def _question_count_for(record):
+    """회의록이 다룬 항목이 많을수록 이해도 확인 질문도 늘린다 (최소 2개, 최대 5개).
+    [안건]/[결정 사항]/[할 일] 아래 '-' 불릿 개수를 복잡도 지표로 쓴다."""
+    bullets = sum(1 for line in record.splitlines() if line.strip().startswith("-"))
+    return max(2, min(5, bullets // 2))
+
+
 def check_questions(meeting):
     if not (_enabled() and meeting.record):
         return list(FAKE_CHECK_QUESTIONS)
+    count = _question_count_for(meeting.record)
     prompt = (
-        "다음 회의록을 읽고, 팀원들이 서로 다르게 이해했을 수 있는 핵심 질문을 한 줄에 하나씩 2개만 써라. 반드시 한국어로만 쓰고 다른 언어를 섞지 마라. "
-        "번호나 설명 없이 질문만 써라.\n\n회의록:\n" + meeting.record
+        "다음 회의록을 읽고, 팀원들이 서로 다르게 이해했을 수 있는 핵심 질문을 한 줄에 하나씩 정확히 %d개 써라. "
+        "반드시 한국어로만 쓰고 다른 언어를 섞지 마라. 번호나 설명 없이 질문만 써라.\n\n회의록:\n%s"
+        % (count, meeting.record)
     )
     try:
         raw = _generate_clean(prompt)
@@ -70,7 +79,7 @@ def check_questions(meeting):
     if raw is None:
         return list(FAKE_CHECK_QUESTIONS)
     lines = [line.strip() for line in raw.splitlines() if line.strip()]
-    return lines[:2] or list(FAKE_CHECK_QUESTIONS)
+    return lines[:count] or list(FAKE_CHECK_QUESTIONS)
 
 
 def summarize(transcript):

@@ -28,28 +28,31 @@
     <h2 class="section-title">업로드된 녹음 ({{ meeting.recordings.count }})</h2>
     <ul class="plain" style="margin-bottom:8px">
     {% for rec in meeting.recordings.all %}
-      <li class="item">
-        <div class="item-main">
-          <span class="item-icon">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4M9 21h6"/></svg>
-          </span>
-          <div class="item-text">
-            <span class="title">{{ rec.filename }}</span>
-            {% if rec.status == "processing" %}<span class="badge processing">전사 중</span>
-            {% elif rec.status == "done" %}<span class="badge done">완료</span>
-            {% else %}<span class="badge failed">실패</span>{% endif %}
-            <div class="meta">{{ rec.created_at|date:"Y.m.d H:i" }}</div>
-            {% if rec.status == "failed" and rec.error_message %}<div class="meta" style="color:var(--danger)">사유: {{ rec.error_message }}</div>{% endif %}
+      <li class="item" style="flex-direction:column;align-items:stretch;gap:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap">
+          <div class="item-main">
+            <span class="item-icon">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4M9 21h6"/></svg>
+            </span>
+            <div class="item-text">
+              <span class="title">{{ rec.filename }}</span>
+              {% if rec.status == "processing" %}<span class="badge processing">전사 중</span>
+              {% elif rec.status == "done" %}<span class="badge done">완료</span>
+              {% else %}<span class="badge failed">실패</span>{% endif %}
+              <div class="meta">{{ rec.created_at|date:"Y.m.d H:i" }}</div>
+              {% if rec.status == "failed" and rec.error_message %}<div class="meta" style="color:var(--danger)">사유: {{ rec.error_message }}</div>{% endif %}
+            </div>
+          </div>
+          <div class="row" style="gap:6px">
+            {% if rec.status == "failed" %}
+            <form method="post" action="{% url 'recording_retry' meeting.id rec.id %}">{% csrf_token %}
+              <button type="submit" class="btn sm secondary">다시 시도</button>
+            </form>
+            {% endif %}
+            <a class="btn sm secondary" href="{% url 'recording_file' meeting.id rec.id %}">받기</a>
           </div>
         </div>
-        <div class="row" style="gap:6px">
-          {% if rec.status == "failed" %}
-          <form method="post" action="{% url 'recording_retry' meeting.id rec.id %}">{% csrf_token %}
-            <button type="submit" class="btn sm secondary">다시 시도</button>
-          </form>
-          {% endif %}
-          <a class="btn sm secondary" href="{% url 'recording_file' meeting.id rec.id %}">받기</a>
-        </div>
+        <audio controls preload="none" style="width:100%;height:36px" src="{% url 'recording_file' meeting.id rec.id %}"></audio>
       </li>
     {% endfor %}
     </ul>

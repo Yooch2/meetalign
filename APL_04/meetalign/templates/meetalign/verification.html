@@ -30,7 +30,10 @@
     <div class="success">엇갈린 답변이 없습니다.</div>
   {% endif %}
   {% if pending %}
-    <h2 class="section-title">아직 답하지 않은 팀원</h2>
+    <div class="page-head" style="margin:26px 0 12px">
+      <h2 class="section-title" style="margin:0">아직 답하지 않은 팀원</h2>
+      <button type="button" class="btn sm secondary" onclick="navigator.clipboard.writeText('{{ reminder_text|escapejs }}').then(() => { this.textContent='복사됨'; setTimeout(() => this.textContent='복사해서 알리기', 1500); })">복사해서 알리기</button>
+    </div>
     <ul class="plain">
     {% for q, missing in pending %}
       <li class="item" style="display:block">
