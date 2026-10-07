@@ -272,6 +272,38 @@ class LocalLLMTests(TestCase):
         gen.assert_not_called()
 
 
+class LanguageFilterTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user("a", password="pw12345!")
+        self.team = Team.objects.create(name="t")
+        self.team.members.add(self.user)
+        self.meeting = Meeting.objects.create(team=self.team, title="m", host=self.user, record="결정: A안으로 진행")
+
+    def test_allows_korean_and_english(self):
+        self.assertTrue(services._is_korean_or_english("What is the 결정 사항?"))
+
+    def test_rejects_cjk_and_japanese_kana(self):
+        self.assertFalse(services._is_korean_or_english("这是中文"))
+        self.assertFalse(services._is_korean_or_english("これは日本語です"))
+
+    def test_check_questions_rejects_mixed_language_output(self):
+        garbled = "IPv6的地址空间更大吗？这是一个问题です"
+        with patch.dict(os.environ, {"OLLAMA_MODEL": "m1"}), patch.object(services, "_generate", return_value=garbled):
+            self.assertEqual(services.check_questions(self.meeting), services.FAKE_CHECK_QUESTIONS)
+
+    def test_summarize_rejects_mixed_language_output(self):
+        with patch.dict(os.environ, {"OLLAMA_MODEL": "m1"}), patch.object(services, "_generate", return_value="这是总结"):
+            self.assertEqual(services.summarize("원문"), "원문")
+
+    def test_chat_reply_rejects_mixed_language_output(self):
+        with patch.dict(os.environ, {"OLLAMA_MODEL": "m1"}), patch.object(services, "_generate", return_value="这是回答"):
+            self.assertIn("언어 오류", services.chat_reply(self.meeting, "q"))
+
+    def test_is_consistent_rejects_mixed_language_verdict(self):
+        with patch.dict(os.environ, {"OLLAMA_MODEL": "m1"}), patch.object(services, "_generate", return_value="一致"):
+            self.assertFalse(services.is_consistent(["a", "b"], record="r", question="q"))
+
+
 @override_settings(BACKGROUND_RECORDING=False)
 class LocalSTTTests(TestCase):
     def setUp(self):

@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 import urllib.request
 
 FAKE_CHECK_QUESTIONS = [
@@ -10,10 +11,16 @@ FAKE_CHECK_QUESTIONS = [
 ]
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434/api/generate")
 TIMEOUT_SECONDS = 120
+# 한국어/영어 외 문자(일본어 가나, 중국어 한자 등)가 섞여나오는 LLM 출력을 걸러낸다.
+_FOREIGN_SCRIPT = re.compile(r"[぀-ヿ一-鿿]")
 
 
 def _enabled():
     return bool(os.environ.get("OLLAMA_MODEL"))
+
+
+def _is_korean_or_english(text):
+    return not _FOREIGN_SCRIPT.search(text)
 
 
 def transcribe(recording_path):
@@ -45,9 +52,12 @@ def check_questions(meeting):
         "번호나 설명 없이 질문만 써라.\n\n회의록:\n" + meeting.record
     )
     try:
-        lines = [line.strip() for line in _generate(prompt).splitlines() if line.strip()]
+        raw = _generate(prompt)
     except OSError:
         return list(FAKE_CHECK_QUESTIONS)
+    if not _is_korean_or_english(raw):
+        return list(FAKE_CHECK_QUESTIONS)
+    lines = [line.strip() for line in raw.splitlines() if line.strip()]
     return lines[:2] or list(FAKE_CHECK_QUESTIONS)
 
 
@@ -59,9 +69,10 @@ def summarize(transcript):
         "[안건]\n- ...\n[결정 사항]\n- ...\n[할 일]\n- ...\n\n전사본:\n" + transcript
     )
     try:
-        return _generate(prompt)
+        result = _generate(prompt)
     except OSError:
         return transcript
+    return result if _is_korean_or_english(result) else transcript
 
 
 def chat_reply(meeting, text):
@@ -72,9 +83,12 @@ def chat_reply(meeting, text):
         "회의록:\n" + meeting.record + "\n\n질문: " + text
     )
     try:
-        return _generate(prompt)
+        result = _generate(prompt)
     except OSError:
         return "(LLM 연결 실패: Ollama가 실행 중인지 확인하세요)"
+    if not _is_korean_or_english(result):
+        return "(LLM 응답 언어 오류: 다시 시도해 주세요)"
+    return result
 
 
 def is_consistent(texts, record="", question=""):
@@ -90,5 +104,7 @@ def is_consistent(texts, record="", question=""):
     try:
         verdict = _generate(prompt)
     except OSError:
+        return False
+    if not _is_korean_or_english(verdict):
         return False
     return "불일치" not in verdict
