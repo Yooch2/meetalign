@@ -1,5 +1,4 @@
 import os
-from datetime import timedelta
 
 from django.contrib.auth import login, logout
 from django.core.exceptions import PermissionDenied
@@ -8,7 +7,6 @@ from django.http import FileResponse, Http404, HttpResponse
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.shortcuts import get_object_or_404, redirect, render
-from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.utils.http import url_has_allowed_host_and_scheme
 
@@ -21,10 +19,7 @@ MAX_RECORDING_BYTES = 500 * 1024 * 1024
 
 def index(request):
     teams = request.user.teams.all() if request.user.is_authenticated else []
-    due_soon = []
-    if request.user.is_authenticated:
-        due_soon = Meeting.objects.filter(team__members=request.user, deadline=timezone.localdate() + timedelta(days=1)).select_related("team")
-    return render(request, "meetalign/index.html", {"teams": teams, "due_soon": due_soon})
+    return render(request, "meetalign/index.html", {"teams": teams})
 
 
 def signup(request):
@@ -61,18 +56,19 @@ def logout_view(request):
 def team_join(request):
     error = ""
     if request.method == "POST":
-        name = request.POST.get("name", "").strip()
         if request.POST.get("action") == "create":
+            name = request.POST.get("name", "").strip()
             if not name or Team.objects.filter(name=name).exists():
                 error = "팀 이름이 비었거나 이미 존재합니다."
             else:
                 team = Team.objects.create(name=name, created_by=request.user)
                 team.members.add(request.user)
-                return redirect("index")
+                return redirect("meeting_list", team_id=team.id)
         else:
-            team = Team.objects.filter(name=name).first()
+            code = request.POST.get("code", "").strip().upper()
+            team = Team.objects.filter(invite_code=code).first()
             if team is None:
-                error = "해당 이름의 팀이 없습니다."
+                error = "해당 초대 코드의 팀이 없습니다."
             else:
                 team.members.add(request.user)
                 return redirect("meeting_list", team_id=team.id)

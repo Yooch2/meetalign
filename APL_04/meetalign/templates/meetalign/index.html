@@ -14,17 +14,6 @@
     팀 생성 / 참여
   </a>
 </div>
-{% if due_soon %}
-<div class="notice">
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex:0 0 auto;margin-top:1px"><path d="M12 9v4M12 17h.01M10.3 3.86 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.86a2 2 0 0 0-3.4 0Z"/></svg>
-  <div>
-    <b>내일 마감인 회의가 있습니다.</b>
-    <ul class="plain" style="margin-top:8px">
-    {% for m in due_soon %}<li>[D-1 마감] {{ m.team.name }} · <a href="{% url 'meeting_detail' m.id %}">{{ m.title }}</a></li>{% endfor %}
-    </ul>
-  </div>
-</div>
-{% endif %}
 <ul class="plain">
 {% for team in teams %}
   <li class="item">

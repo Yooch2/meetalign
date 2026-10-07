@@ -1,13 +1,23 @@
 import os
+import secrets
+import string
 from datetime import timedelta
 
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
+# 혼동하기 쉬운 문자(0/O, 1/I)는 빼고 초대 코드를 만든다.
+INVITE_CODE_ALPHABET = "".join(c for c in string.ascii_uppercase + string.digits if c not in "0O1I")
+
+
+def _generate_invite_code():
+    return "".join(secrets.choice(INVITE_CODE_ALPHABET) for _ in range(6))
+
 
 class Team(models.Model):
     name = models.CharField(max_length=100, unique=True)
+    invite_code = models.CharField(max_length=8, unique=True, editable=False, default=_generate_invite_code)
     members = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name="teams")
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="created_teams")
 

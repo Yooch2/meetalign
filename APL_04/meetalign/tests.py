@@ -72,8 +72,18 @@ class PrototypeFlowTests(TestCase):
         self.client.post(reverse("team_join"), {"action": "create", "name": "new"})
         self.assertTrue(Team.objects.get(name="new").members.filter(pk=self.user.pk).exists())
         other_team = Team.objects.create(name="o")
-        self.client.post(reverse("team_join"), {"action": "join", "name": "o"})
+        self.client.post(reverse("team_join"), {"action": "join", "code": other_team.invite_code})
         self.assertTrue(other_team.members.filter(pk=self.user.pk).exists())
+
+    def test_join_rejects_unknown_invite_code(self):
+        r = self.client.post(reverse("team_join"), {"action": "join", "code": "ZZZZZZ"})
+        self.assertContains(r, "해당 초대 코드의 팀이 없습니다")
+
+    def test_each_team_gets_unique_invite_code(self):
+        a = Team.objects.create(name="a-team")
+        b = Team.objects.create(name="b-team")
+        self.assertNotEqual(a.invite_code, b.invite_code)
+        self.assertEqual(len(a.invite_code), 6)
 
     def test_non_member_forbidden(self):
         meeting = Meeting.objects.create(team=Team.objects.create(name="other"), title="x")
@@ -193,6 +203,11 @@ class PrototypeFlowTests(TestCase):
         self.meeting.save()
         self.assertContains(self.client.get(reverse("meeting_detail", args=[self.meeting.id])), "마감 D-1")
         self.assertContains(self.client.get(reverse("meeting_list", args=[self.team.id])), "[D-1 마감]")
+
+    def test_d1_banner_shown_on_every_page_not_just_index(self):
+        self.meeting.deadline = timezone.localdate() + timedelta(days=1)
+        self.meeting.save()
+        self.assertContains(self.client.get(reverse("team_join")), "내일 마감인 회의가 있습니다")
 
     def test_no_banner_when_deadline_further_away(self):
         self.meeting.deadline = timezone.localdate() + timedelta(days=3)

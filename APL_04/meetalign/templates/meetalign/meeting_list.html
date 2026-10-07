@@ -11,6 +11,11 @@
     회의 만들기
   </a>
 </div>
+<div class="notice" id="invite-code-notice" style="align-items:center">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:0 0 auto"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M3 9.5 12 14l9-4.5"/></svg>
+  <span>초대 코드: <b id="invite-code-text">{{ team.invite_code }}</b> — 팀원에게 공유해서 참여시키세요.</span>
+  <button type="button" class="btn sm secondary" style="margin-left:auto" onclick="navigator.clipboard.writeText('{{ team.invite_code }}').then(() => { this.textContent='복사됨'; setTimeout(() => this.textContent='복사', 1500); })">복사</button>
+</div>
 <ul class="plain">
 {% for m in meetings %}
   <li class="item">
