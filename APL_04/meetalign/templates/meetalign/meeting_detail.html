@@ -4,56 +4,100 @@
 <li>제출 → 회의록 생성 화면, 종료 → 이해도 질문 답변 화면(3.5)으로 이동한다.</li>
 {% endblock %}
 {% block content %}
-<div class="card">
-  <div class="page-head">
+<div class="page-head">
+  <div>
     <div class="crumb"><a href="{% url 'meeting_list' meeting.team_id %}">회의 목록</a></div>
     <h1>{{ meeting.title }}
       {% if meeting.ended %}<span class="badge ended">종료</span>{% endif %}
       {% if meeting.is_due_tomorrow %}<span class="badge due">마감 D-1</span>{% endif %}
     </h1>
-    {% if meeting.deadline %}<div class="muted">마감 {{ meeting.deadline|date:"Y.m.d" }}</div>{% endif %}
+    {% if meeting.deadline %}<div class="sub">마감 {{ meeting.deadline|date:"Y년 m월 d일" }}</div>{% endif %}
   </div>
-  {% if meeting.is_due_tomorrow %}<div class="notice"><b>마감 D-1:</b> 내일 마감입니다.</div>{% endif %}
+</div>
+
+<div class="card elevated">
+  {% if meeting.is_due_tomorrow %}
+  <div class="notice">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex:0 0 auto;margin-top:1px"><path d="M12 9v4M12 17h.01M10.3 3.86 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.86a2 2 0 0 0-3.4 0Z"/></svg>
+    <span><b>마감 D-1:</b> 내일 마감입니다.</span>
+  </div>
+  {% endif %}
   {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
   {% if meeting.recordings.all %}
-    <h2 style="margin-top:0">업로드된 녹음 ({{ meeting.recordings.count }})</h2>
-    <ul class="plain" style="margin-bottom:18px">
+    <h2 class="section-title">업로드된 녹음 ({{ meeting.recordings.count }})</h2>
+    <ul class="plain" style="margin-bottom:8px">
     {% for rec in meeting.recordings.all %}
       <li class="item">
-        <div>
-          <span class="title">{{ rec.filename }}</span>
-          {% if rec.status == "processing" %}<span class="badge processing">전사 중</span>
-          {% elif rec.status == "done" %}<span class="badge done">완료</span>
-          {% else %}<span class="badge failed">실패</span>{% endif %}
-          <div class="meta">{{ rec.created_at|date:"Y.m.d H:i" }}</div>
+        <div class="item-main">
+          <span class="item-icon">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4M9 21h6"/></svg>
+          </span>
+          <div class="item-text">
+            <span class="title">{{ rec.filename }}</span>
+            {% if rec.status == "processing" %}<span class="badge processing">전사 중</span>
+            {% elif rec.status == "done" %}<span class="badge done">완료</span>
+            {% else %}<span class="badge failed">실패</span>{% endif %}
+            <div class="meta">{{ rec.created_at|date:"Y.m.d H:i" }}</div>
+          </div>
         </div>
-        <a class="btn secondary" href="{% url 'recording_file' meeting.id rec.id %}">받기</a>
+        <a class="btn sm secondary" href="{% url 'recording_file' meeting.id rec.id %}">받기</a>
       </li>
     {% endfor %}
     </ul>
   {% endif %}
+
   {% if meeting.ended %}
-    <div class="notice">회의가 종료되었습니다. 녹음 업로드와 익명 질문은 더 이상 받지 않습니다. 이해도 질문에 답해 주세요.</div>
-    <div class="row"><a class="btn" href="{% url 'understanding' meeting.id %}">이해도 질문 답하기</a></div>
+    <div class="notice" style="background:var(--surface-sunken);color:var(--ink-soft);border-color:var(--line)">
+      회의가 종료되었습니다. 녹음 업로드와 익명 질문은 더 이상 받지 않습니다. 이해도 질문에 답해 주세요.
+    </div>
+    <a class="btn" href="{% url 'understanding' meeting.id %}">이해도 질문 답하기</a>
   {% else %}
+  <h2 class="section-title">{% if meeting.recordings.all %}녹음 추가 업로드{% else %}회의 녹음{% endif %}</h2>
   <form method="post" enctype="multipart/form-data">{% csrf_token %}
     <div class="field"><label for="recording">회의 녹음 파일</label>
       <input id="recording" type="file" name="recording" accept="audio/*"></div>
     <div class="row">
-      <button name="action" value="submit">녹음 제출하고 회의록 만들기</button>
+      <button name="action" value="submit">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h12M13 6l6 6-6 6"/></svg>
+        녹음 제출하고 회의록 만들기
+      </button>
       <button name="action" value="end" class="secondary"
         onclick="return confirm('회의를 종료할까요? 종료 후에는 녹음 업로드와 익명 질문이 막힙니다.');">회의 종료</button>
     </div>
   </form>
   {% endif %}
 </div>
-<div class="card">
-  <h2 style="margin-top:0">이 회의 둘러보기</h2>
-  <ul class="plain">
-    <li class="item"><span class="title">대화창</span><a class="btn secondary" href="{% url 'chat' meeting.id %}">열기</a></li>
-    <li class="item"><span class="title">익명 질문함</span><a class="btn secondary" href="{% url 'inbox' meeting.id %}">열기</a></li>
-    <li class="item"><span class="title">회의 요약</span><a class="btn secondary" href="{% url 'summary' meeting.id %}">보기</a></li>
-    <li class="item"><span class="title">이해도 검증</span><a class="btn secondary" href="{% url 'understanding' meeting.id %}">답하기</a></li>
-  </ul>
-</div>
+
+<h2 class="section-title">이 회의 둘러보기</h2>
+<ul class="plain">
+  <li class="item">
+    <div class="item-main">
+      <span class="item-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.4 8.4 0 0 1-8.9 8.4 8.6 8.6 0 0 1-3.7-.8L3 20l1-5a8.5 8.5 0 0 1-1-4.1A8.4 8.4 0 0 1 11.9 2a8.4 8.4 0 0 1 9 8.4Z"/></svg></span>
+      <span class="title">대화창</span>
+    </div>
+    <a class="btn sm secondary" href="{% url 'chat' meeting.id %}">열기</a>
+  </li>
+  <li class="item">
+    <div class="item-main">
+      <span class="item-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></span>
+      <span class="title">익명 질문함</span>
+    </div>
+    <a class="btn sm secondary" href="{% url 'inbox' meeting.id %}">열기</a>
+  </li>
+  <li class="item">
+    <div class="item-main">
+      <span class="item-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg></span>
+      <span class="title">회의 요약</span>
+    </div>
+    <a class="btn sm secondary" href="{% url 'summary' meeting.id %}">보기</a>
+  </li>
+  <li class="item">
+    <div class="item-main">
+      <span class="item-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 12 2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg></span>
+      <span class="title">이해도 검증</span>
+    </div>
+    <a class="btn sm secondary" href="{% url 'understanding' meeting.id %}">답하기</a>
+  </li>
+</ul>
 {% endblock %}

@@ -4,11 +4,13 @@
 <li>익명 질문은 작성자를 저장하지 않는다. 로컬 LLM이 꺼져 있으면 가짜 응답이 나온다.</li>
 {% endblock %}
 {% block content %}
-<div class="card">
-  <div class="page-head">
+<div class="page-head">
+  <div>
     <div class="crumb"><a href="{% url 'meeting_detail' meeting.id %}">{{ meeting.title }}</a></div>
     <h1>대화창</h1>
   </div>
+</div>
+<div class="card elevated">
   <div class="tabs">
     <a href="?mode=llm" class="{% if mode != 'anon' %}on{% endif %}">회의 내용에 대해 질문</a>
     <a href="?mode=anon" class="{% if mode == 'anon' %}on{% endif %}">주최자에게 익명 질문</a>

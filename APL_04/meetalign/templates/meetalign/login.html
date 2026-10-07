@@ -1,16 +1,29 @@
 {% extends "meetalign/base.html" %}
 {% block note %}<li>Django 기본 인증(자체 로그인)으로 실제 로그인한다.</li>{% endblock %}
+{% block container_class %} wide{% endblock %}
 {% block content %}
-<div class="card" style="max-width:420px;margin:24px auto">
-  <div class="page-head"><h1>로그인</h1></div>
-  {% if form.errors %}<div class="error">아이디 또는 비밀번호가 올바르지 않습니다.</div>{% endif %}
-  <form method="post">{% csrf_token %}
-    <div class="field"><label for="id_username">아이디</label>
-      <input id="id_username" name="username" value="{{ form.username.value|default:'' }}" autofocus></div>
-    <div class="field"><label for="id_password">비밀번호</label>
-      <input id="id_password" name="password" type="password"></div>
-    <div class="row" style="margin-top:6px"><button type="submit">로그인</button></div>
-  </form>
-  <p class="muted" style="margin-top:16px">계정이 없나요? <a href="{% url 'signup' %}">회원가입</a></p>
+<div class="auth-shell">
+  <div class="auth-panel">
+    <span class="brand-mark">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="14" height="14" rx="5" fill="#fff"/><rect x="8" y="7" width="14" height="14" rx="5" fill="#fff" opacity=".55"/></svg>
+      <span class="brand-wordmark">MeetAlign</span>
+    </span>
+    <div>
+      <h2>"분명 다 같이 이해했다고<br>생각했는데..."</h2>
+      <p>회의록과 팀원 답변을 비교해서, 조용히 어긋난 부분을 짚어줍니다.</p>
+    </div>
+  </div>
+  <div class="auth-form">
+    <h1>로그인</h1>
+    {% if form.errors %}<div class="error">아이디 또는 비밀번호가 올바르지 않습니다.</div>{% endif %}
+    <form method="post">{% csrf_token %}
+      <div class="field"><label for="id_username">아이디</label>
+        <input id="id_username" name="username" value="{{ form.username.value|default:'' }}" autofocus></div>
+      <div class="field"><label for="id_password">비밀번호</label>
+        <input id="id_password" name="password" type="password"></div>
+      <button type="submit" class="block" style="margin-top:6px">로그인</button>
+    </form>
+    <p class="muted" style="margin-top:18px">계정이 없나요? <a href="{% url 'signup' %}">회원가입</a></p>
+  </div>
 </div>
 {% endblock %}

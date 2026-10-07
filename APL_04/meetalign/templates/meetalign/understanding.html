@@ -1,17 +1,19 @@
 {% extends "meetalign/base.html" %}
 {% block note %}<li>이해도 검증(3.5): 질문에 각자 답한다. 답변은 사용자별로 저장되어 팀원 간 비교에 쓰인다.</li>{% endblock %}
 {% block content %}
-<div class="card">
-  <div class="page-head">
+<div class="page-head">
+  <div>
     <div class="crumb"><a href="{% url 'meeting_detail' meeting.id %}">{{ meeting.title }}</a></div>
     <h1>이해도 질문에 답하기</h1>
   </div>
+</div>
+<div class="card elevated">
   <form method="post">{% csrf_token %}
     {% for q, ans in rows %}
       <div class="field"><label for="q{{ q.id }}">{{ forloop.counter }}. {{ q.text }}</label>
         <input id="q{{ q.id }}" name="q{{ q.id }}" value="{{ ans }}" placeholder="내가 이해한 내용을 적어 주세요"></div>
     {% empty %}
-      <div class="empty">아직 질문이 없습니다. 회의록이 만들어지면 질문이 생성됩니다.</div>
+      <div class="empty"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11V6a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v5"/><path d="M4 11h4.5a1 1 0 0 1 .9.55L10.5 14h3l1.1-2.45a1 1 0 0 1 .9-.55H20"/><path d="M4 11v6a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-6"/></svg>아직 질문이 없습니다. 회의록이 만들어지면 질문이 생성됩니다.</div>
     {% endfor %}
     {% if rows %}<div class="row" style="margin-top:8px"><button>답변 저장</button></div>{% endif %}
   </form>

@@ -2,11 +2,13 @@
 {% block note %}<li>녹음 전사와 회의록 생성은 백그라운드에서 진행된다. 진행 중이면 5초마다 자동으로 새로고침한다.</li>{% endblock %}
 {% block head %}{% if meeting.processing_status == "processing" %}<meta http-equiv="refresh" content="5">{% endif %}{% endblock %}
 {% block content %}
-<div class="card">
-  <div class="page-head">
+<div class="page-head">
+  <div>
     <div class="crumb"><a href="{% url 'meeting_detail' meeting.id %}">{{ meeting.title }}</a></div>
     <h1>회의록 생성</h1>
   </div>
+</div>
+<div class="card elevated">
   {% if meeting.processing_status == "processing" %}
     <div class="notice"><span class="spinner"></span> &nbsp;녹음을 전사하고 회의록을 만드는 중입니다. 길이에 따라 몇 분 걸릴 수 있습니다. 이 화면은 자동으로 갱신됩니다.</div>
   {% elif meeting.processing_status == "done" %}
