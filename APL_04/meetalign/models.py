@@ -58,6 +58,7 @@ class Recording(models.Model):
     file = models.FileField(upload_to="recordings/")
     transcript = models.TextField(blank=True)
     status = models.CharField(max_length=20, default=STATUS_PROCESSING)
+    error_message = models.CharField(max_length=300, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

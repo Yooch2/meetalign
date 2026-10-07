@@ -21,7 +21,12 @@ def _meeting_lock(meeting_id):
 
 def refresh_meeting(meeting):
     recordings = list(meeting.recordings.all())
-    full_transcript = "\n\n".join(r.transcript for r in recordings if r.transcript)
+    transcribed = [r for r in recordings if r.transcript]
+    if len(transcribed) > 1:
+        # 녹음이 여러 개면 어느 파일에서 나온 내용인지 구분할 수 있게 파일명으로 구획을 나눈다.
+        full_transcript = "\n\n".join("[%s]\n%s" % (r.filename, r.transcript) for r in transcribed)
+    else:
+        full_transcript = "\n\n".join(r.transcript for r in transcribed)
     meeting.transcript = full_transcript
     meeting.record = services.summarize(full_transcript) if full_transcript else ""
     if any(r.status == Recording.STATUS_PROCESSING for r in recordings):
@@ -43,10 +48,12 @@ def process_recording(recording_id):
         try:
             recording.transcript = services.transcribe(recording.file.path) or ""
             recording.status = Recording.STATUS_DONE
-        except Exception:
+            recording.error_message = ""
+        except Exception as exc:
             logger.exception("recording processing failed for recording %s", recording_id)
             recording.status = Recording.STATUS_FAILED
-        recording.save(update_fields=["transcript", "status"])
+            recording.error_message = str(exc)[:300]
+        recording.save(update_fields=["transcript", "status", "error_message"])
         refresh_meeting(meeting)
 
 
@@ -58,7 +65,8 @@ def recover_stuck(meeting):
         return
     for recording in stuck:
         recording.status = Recording.STATUS_FAILED
-        recording.save(update_fields=["status"])
+        recording.error_message = "서버가 재시작되어 처리가 중단되었습니다"
+        recording.save(update_fields=["status", "error_message"])
     refresh_meeting(meeting)
 
 

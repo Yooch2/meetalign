@@ -318,6 +318,20 @@ class LanguageFilterTests(TestCase):
         with patch.dict(os.environ, {"OLLAMA_MODEL": "m1"}), patch.object(services, "_generate", return_value="一致"):
             self.assertFalse(services.is_consistent(["a", "b"], record="r", question="q"))
 
+    def test_retries_once_then_succeeds_on_clean_output(self):
+        with patch.dict(os.environ, {"OLLAMA_MODEL": "m1"}), patch.object(
+            services, "_generate", side_effect=["这是中文", "질문1\n질문2"]
+        ) as gen:
+            self.assertEqual(services.check_questions(self.meeting), ["질문1", "질문2"])
+        self.assertEqual(gen.call_count, 2)
+
+    def test_gives_up_after_one_retry_still_garbled(self):
+        with patch.dict(os.environ, {"OLLAMA_MODEL": "m1"}), patch.object(
+            services, "_generate", return_value="这是中文"
+        ) as gen:
+            self.assertEqual(services.check_questions(self.meeting), services.FAKE_CHECK_QUESTIONS)
+        self.assertEqual(gen.call_count, 2)
+
 
 @override_settings(BACKGROUND_RECORDING=False)
 class LocalSTTTests(TestCase):
@@ -508,6 +522,26 @@ class SemanticDiscrepancyTests(TestCase):
         self.assertEqual(r.context["progress_pct"], 50)
         self.assertContains(r, "1 / 2")
 
+    def test_view_shows_llm_explanation_for_discrepancy(self):
+        self._answer("이메일 로그인", "소셜 로그인 포함")
+        with patch.dict(os.environ, {"OLLAMA_MODEL": "m1"}), patch.object(
+            services, "_generate", side_effect=["불일치", "소셜 로그인 포함 여부에 대한 해석이 다릅니다."]
+        ):
+            r = self.client.get(reverse("verification", args=[self.meeting.id]))
+        self.assertContains(r, "소셜 로그인 포함 여부에 대한 해석이 다릅니다.")
+
+    def test_explain_discrepancy_returns_empty_without_llm(self):
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(
+                services.explain_discrepancy("record", "question", ["a", "b"]), ""
+            )
+
+    def test_explain_discrepancy_falls_back_silently_on_llm_error(self):
+        with patch.dict(os.environ, {"OLLAMA_MODEL": "m1"}), patch.object(services, "_generate", side_effect=OSError("down")):
+            self.assertEqual(
+                services.explain_discrepancy("record", "question", ["a", "b"]), ""
+            )
+
 
 class QuestionTimingTests(TestCase):
     def setUp(self):
@@ -556,6 +590,24 @@ class BackgroundProcessingTests(TestCase):
             self._upload()
         self.meeting.refresh_from_db()
         self.assertEqual(self.meeting.processing_status, Meeting.STATUS_FAILED)
+
+    def test_failure_records_error_message_for_display(self):
+        with patch.object(services, "transcribe", side_effect=RuntimeError("ffmpeg not found")):
+            self._upload()
+        rec = self.meeting.recordings.get()
+        self.assertEqual(rec.error_message, "ffmpeg not found")
+        r = self.client.get(reverse("meeting_detail", args=[self.meeting.id]))
+        self.assertContains(r, "ffmpeg not found")
+
+    def test_retry_clears_previous_error_message(self):
+        rec = Recording.objects.create(
+            meeting=self.meeting, file=SimpleUploadedFile("a.wav", b"RIFF"),
+            status=Recording.STATUS_FAILED, error_message="이전 오류",
+        )
+        with patch.object(tasks, "start_processing"):
+            self.client.post(reverse("recording_retry", args=[self.meeting.id, rec.id]))
+        rec.refresh_from_db()
+        self.assertEqual(rec.error_message, "")
 
     def test_result_page_shows_processing_message_and_refresh(self):
         self.meeting.processing_status = Meeting.STATUS_PROCESSING
@@ -649,6 +701,34 @@ class StuckAndFileAccessTests(TestCase):
 
     def test_unknown_recording_returns_404(self):
         self.assertEqual(self.client.get(reverse("recording_file", args=[self.meeting.id, 99999])).status_code, 404)
+
+    def test_retry_button_shown_only_for_failed_recordings(self):
+        self._make_recording("done.wav", b"R")
+        failed = Recording.objects.create(meeting=self.meeting, file=SimpleUploadedFile("f.wav", b"R"), status=Recording.STATUS_FAILED)
+        r = self.client.get(reverse("meeting_detail", args=[self.meeting.id]))
+        self.assertContains(r, "다시 시도")
+        self.assertEqual(r.content.decode().count("다시 시도"), 1)
+
+    def test_retry_resets_failed_recording_and_reprocesses(self):
+        failed = Recording.objects.create(meeting=self.meeting, file=SimpleUploadedFile("f.wav", b"R"), status=Recording.STATUS_FAILED)
+        with patch.object(tasks, "start_processing") as start:
+            r = self.client.post(reverse("recording_retry", args=[self.meeting.id, failed.id]))
+        self.assertEqual(r.status_code, 302)
+        failed.refresh_from_db()
+        self.assertEqual(failed.status, Recording.STATUS_PROCESSING)
+        start.assert_called_once_with(failed.id)
+
+    def test_cannot_retry_a_recording_that_is_not_failed(self):
+        done = self._make_recording("d.wav", b"R")
+        r = self.client.post(reverse("recording_retry", args=[self.meeting.id, done.id]))
+        self.assertEqual(r.status_code, 404)
+
+    def test_outsider_cannot_retry_recording(self):
+        failed = Recording.objects.create(meeting=self.meeting, file=SimpleUploadedFile("f.wav", b"R"), status=Recording.STATUS_FAILED)
+        outsider = User.objects.create_user("d", password="pw12345!")
+        client = Client()
+        client.force_login(outsider)
+        self.assertEqual(client.post(reverse("recording_retry", args=[self.meeting.id, failed.id])).status_code, 404)
 
 
 class DesignAlignmentTests(TestCase):
@@ -752,7 +832,12 @@ class MultipleRecordingsTests(TestCase):
             tasks.process_recording(first.id)
             tasks.process_recording(second.id)
         self.meeting.refresh_from_db()
-        self.assertEqual(self.meeting.transcript, "앞부분 전사\n\n뒷부분 전사")
+        first.refresh_from_db()
+        second.refresh_from_db()
+        self.assertEqual(
+            self.meeting.transcript,
+            "[%s]\n앞부분 전사\n\n[%s]\n뒷부분 전사" % (first.filename, second.filename),
+        )
         self.assertEqual(self.meeting.processing_status, Meeting.STATUS_DONE)
 
     def test_meeting_stays_processing_while_any_recording_is_running(self):

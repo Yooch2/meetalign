@@ -169,6 +169,16 @@ def recording_file(request, meeting_id, recording_id):
 
 
 @login_required
+def recording_retry(request, meeting_id, recording_id):
+    meeting = _meeting(request, meeting_id)
+    recording = get_object_or_404(Recording, pk=recording_id, meeting=meeting, status=Recording.STATUS_FAILED)
+    if request.method == "POST":
+        Recording.objects.filter(pk=recording.pk).update(status=Recording.STATUS_PROCESSING, error_message="")
+        tasks.start_processing(recording.id)
+    return redirect("meeting_result", meeting_id=meeting.id)
+
+
+@login_required
 def chat(request, meeting_id):
     meeting = _meeting(request, meeting_id)
     mode = request.POST.get("mode") or request.GET.get("mode", "llm")
@@ -220,8 +230,10 @@ def _find_discrepancies(meeting):
     found = []
     for question in meeting.check_questions.all():
         answers = list(question.answers.select_related("user"))
-        if not services.is_consistent([a.text for a in answers], record=meeting.record, question=question.text):
-            found.append((question, answers))
+        texts = [a.text for a in answers]
+        if not services.is_consistent(texts, record=meeting.record, question=question.text):
+            explanation = services.explain_discrepancy(meeting.record, question.text, texts)
+            found.append((question, answers, explanation))
     return found
 
 

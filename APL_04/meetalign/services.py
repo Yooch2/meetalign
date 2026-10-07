@@ -44,6 +44,18 @@ def _generate(prompt):
         return json.loads(response.read().decode("utf-8"))["response"].strip()
 
 
+def _generate_clean(prompt, retries=1):
+    """_generate()를 호출하고 한국어/영어 외 언어가 섞이면 같은 프롬프트로 재시도한다.
+    연결 실패는 OSError를 그대로 올리고(호출자가 구분해서 처리), 재시도 후에도 언어가
+    깨끗하지 않으면 None을 반환한다 — 연결은 됐지만 출력 품질이 나쁜 경우를 구분하기 위함."""
+    result = None
+    for attempt in range(retries + 1):
+        result = _generate(prompt)
+        if _is_korean_or_english(result):
+            return result
+    return None
+
+
 def check_questions(meeting):
     if not (_enabled() and meeting.record):
         return list(FAKE_CHECK_QUESTIONS)
@@ -52,10 +64,10 @@ def check_questions(meeting):
         "번호나 설명 없이 질문만 써라.\n\n회의록:\n" + meeting.record
     )
     try:
-        raw = _generate(prompt)
+        raw = _generate_clean(prompt)
     except OSError:
         return list(FAKE_CHECK_QUESTIONS)
-    if not _is_korean_or_english(raw):
+    if raw is None:
         return list(FAKE_CHECK_QUESTIONS)
     lines = [line.strip() for line in raw.splitlines() if line.strip()]
     return lines[:2] or list(FAKE_CHECK_QUESTIONS)
@@ -69,10 +81,10 @@ def summarize(transcript):
         "[안건]\n- ...\n[결정 사항]\n- ...\n[할 일]\n- ...\n\n전사본:\n" + transcript
     )
     try:
-        result = _generate(prompt)
+        result = _generate_clean(prompt)
     except OSError:
         return transcript
-    return result if _is_korean_or_english(result) else transcript
+    return result if result is not None else transcript
 
 
 def chat_reply(meeting, text):
@@ -83,10 +95,10 @@ def chat_reply(meeting, text):
         "회의록:\n" + meeting.record + "\n\n질문: " + text
     )
     try:
-        result = _generate(prompt)
+        result = _generate_clean(prompt)
     except OSError:
         return "(LLM 연결 실패: Ollama가 실행 중인지 확인하세요)"
-    if not _is_korean_or_english(result):
+    if result is None:
         return "(LLM 응답 언어 오류: 다시 시도해 주세요)"
     return result
 
@@ -102,9 +114,26 @@ def is_consistent(texts, record="", question=""):
         "회의록:\n" + record + "\n\n질문: " + question + "\n\n답변:\n" + "\n".join("- " + t for t in texts)
     )
     try:
-        verdict = _generate(prompt)
+        verdict = _generate_clean(prompt)
     except OSError:
         return False
-    if not _is_korean_or_english(verdict):
+    if verdict is None:
         return False
     return "불일치" not in verdict
+
+
+def explain_discrepancy(record, question, answers):
+    """팀원 답변이 엇갈릴 때, 무엇이 왜 다르게 이해됐는지 한두 문장으로 설명한다.
+    로컬 LLM이 꺼져 있거나 실패하면 빈 문자열을 반환해 화면에서 설명 없이도 답변 목록만 보이게 한다."""
+    if not (_enabled() and record and question and answers):
+        return ""
+    prompt = (
+        "회의록과 질문, 팀원들의 서로 다른 답변이 주어진다. 답변들이 구체적으로 어떤 부분에서 다르게 이해됐는지 "
+        "한두 문장으로 짧게 설명하라. 반드시 한국어로만 답하고, 설명 외에 다른 말은 하지 마라.\n\n"
+        "회의록:\n" + record + "\n\n질문: " + question + "\n\n답변:\n" + "\n".join("- " + t for t in answers)
+    )
+    try:
+        result = _generate_clean(prompt)
+    except OSError:
+        return ""
+    return result or ""
