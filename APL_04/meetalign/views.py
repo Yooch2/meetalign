@@ -260,7 +260,7 @@ def question_review(request, meeting_id):
     """주최자가 AI가 낸 객관식 문제를 검토·수정하고, 준비되면 참가자에게 공개한다."""
     meeting = _meeting(request, meeting_id)
     _require_host(meeting, request.user)
-    if meeting.record and not meeting.check_questions.exists():
+    if meeting.transcript and not meeting.check_questions.exists():
         for order, q in enumerate(services.generate_check_questions(meeting)):
             try:
                 with transaction.atomic():
