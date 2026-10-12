@@ -124,6 +124,17 @@ class PrototypeFlowTests(TestCase):
         self.assertContains(r, "<audio")
         self.assertContains(r, reverse("recording_file", args=[self.meeting.id, rec.id]))
 
+    def test_meeting_detail_offers_mic_recording_before_upload(self):
+        r = self.client.get(reverse("meeting_detail", args=[self.meeting.id]))
+        self.assertContains(r, "record-toggle")
+        self.assertContains(r, "getUserMedia")
+
+    def test_mic_recording_not_offered_once_meeting_ended(self):
+        self.meeting.ended = True
+        self.meeting.save()
+        r = self.client.get(reverse("meeting_detail", args=[self.meeting.id]))
+        self.assertNotContains(r, "record-toggle")
+
     def test_summary_shows_saved_record(self):
         self.meeting.record = "결정: A안으로 진행"
         self.meeting.save()

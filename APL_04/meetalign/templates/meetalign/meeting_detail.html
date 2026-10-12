@@ -66,8 +66,19 @@
   {% else %}
   <h2 class="section-title">{% if meeting.recordings.all %}녹음 추가 업로드{% else %}회의 녹음{% endif %}</h2>
   <form method="post" enctype="multipart/form-data">{% csrf_token %}
-    <div class="field"><label for="recording">회의 녹음 파일</label>
-      <input id="recording" type="file" name="recording" accept="audio/*"></div>
+    <div class="field">
+      <label for="recording">회의 녹음 파일</label>
+      <div class="row" style="margin-bottom:8px">
+        <button type="button" id="record-toggle" class="btn sm secondary">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>
+          마이크로 녹음하기
+        </button>
+        <span id="record-timer" class="muted" style="display:none">0:00</span>
+      </div>
+      <audio id="record-preview" controls style="display:none;width:100%;margin-bottom:10px"></audio>
+      <input id="recording" type="file" name="recording" accept="audio/*">
+      <p class="muted" style="margin:4px 0 0">마이크 녹음은 이 기기(localhost)에서 직접 열었을 때만 동작합니다. 다른 기기에서 접속했다면 파일을 올려 주세요.</p>
+    </div>
     <div class="row">
       <button name="action" value="submit">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h12M13 6l6 6-6 6"/></svg>
@@ -77,6 +88,67 @@
         onclick="return confirm('회의를 종료할까요? 종료 후에는 녹음 업로드와 익명 질문이 막힙니다.');">회의 종료</button>
     </div>
   </form>
+  <script>
+  (function () {
+    var toggleBtn = document.getElementById("record-toggle");
+    var timerEl = document.getElementById("record-timer");
+    var preview = document.getElementById("record-preview");
+    var fileInput = document.getElementById("recording");
+    if (!toggleBtn || !navigator.mediaDevices || !window.MediaRecorder) {
+      if (toggleBtn) toggleBtn.style.display = "none";
+      return;
+    }
+
+    var mediaRecorder = null;
+    var chunks = [];
+
+    function formatTime(totalSeconds) {
+      var m = Math.floor(totalSeconds / 60);
+      var s = totalSeconds % 60;
+      return m + ":" + (s < 10 ? "0" : "") + s;
+    }
+
+    toggleBtn.addEventListener("click", function () {
+      if (mediaRecorder && mediaRecorder.state === "recording") {
+        mediaRecorder.stop();
+        return;
+      }
+      navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+        chunks = [];
+        mediaRecorder = new MediaRecorder(stream);
+        var startTime = Date.now();
+        var timerInterval = setInterval(function () {
+          timerEl.textContent = formatTime(Math.floor((Date.now() - startTime) / 1000));
+        }, 1000);
+
+        mediaRecorder.addEventListener("dataavailable", function (e) {
+          if (e.data.size > 0) chunks.push(e.data);
+        });
+        mediaRecorder.addEventListener("stop", function () {
+          stream.getTracks().forEach(function (track) { track.stop(); });
+          clearInterval(timerInterval);
+          timerEl.style.display = "none";
+          var blob = new Blob(chunks, { type: mediaRecorder.mimeType || "audio/webm" });
+          var file = new File([blob], "recording.webm", { type: blob.type });
+          var dataTransfer = new DataTransfer();
+          dataTransfer.items.add(file);
+          fileInput.files = dataTransfer.files;
+          preview.src = URL.createObjectURL(blob);
+          preview.style.display = "block";
+          toggleBtn.textContent = "다시 녹음하기";
+        });
+
+        mediaRecorder.start();
+        timerEl.textContent = "0:00";
+        timerEl.style.display = "inline";
+        toggleBtn.textContent = "■ 녹음 중지";
+        preview.style.display = "none";
+      }).catch(function (err) {
+        alert("마이크 접근 권한이 필요합니다: " + err.message);
+      });
+    });
+  })();
+  </script>
   {% endif %}
 </div>
 
