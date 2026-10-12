@@ -62,7 +62,11 @@
     <div class="notice" style="background:var(--surface-sunken);color:var(--ink-soft);border-color:var(--line)">
       회의가 종료되었습니다. 녹음 업로드와 익명 질문은 더 이상 받지 않습니다. 이해도 질문에 답해 주세요.
     </div>
-    <a class="btn" href="{% url 'understanding' meeting.id %}">이해도 질문 답하기</a>
+    {% if meeting.host_id == user.id %}
+      <a class="btn" href="{% url 'question_review' meeting.id %}">문제 검토하고 공개하기</a>
+    {% else %}
+      <a class="btn" href="{% url 'understanding' meeting.id %}">이해도 질문 답하기</a>
+    {% endif %}
   {% else %}
   <h2 class="section-title">{% if meeting.recordings.all %}녹음 추가 업로드{% else %}회의 녹음{% endif %}</h2>
   <form method="post" enctype="multipart/form-data">{% csrf_token %}
@@ -186,9 +190,16 @@
   <li class="item">
     <div class="item-main">
       <span class="item-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 12 2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg></span>
-      <span class="title">이해도 검증</span>
+      <div class="item-text">
+        <span class="title">이해도 검증</span>
+        {% if meeting.host_id == user.id %}<div class="meta">AI가 낸 객관식 문제를 검토하고 공개합니다</div>{% endif %}
+      </div>
     </div>
-    <a class="btn sm secondary" href="{% url 'understanding' meeting.id %}">답하기</a>
+    {% if meeting.host_id == user.id %}
+      <a class="btn sm secondary" href="{% url 'question_review' meeting.id %}">문제 검토</a>
+    {% else %}
+      <a class="btn sm secondary" href="{% url 'understanding' meeting.id %}">답하기</a>
+    {% endif %}
   </li>
 </ul>
 {% if meeting.host_id == user.id %}
