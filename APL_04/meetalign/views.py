@@ -195,7 +195,7 @@ def chat(request, meeting_id):
             if meeting.ended:
                 error = "종료된 회의에는 익명 질문을 보낼 수 없습니다."
             else:
-                Question.objects.create(meeting=meeting, text=text)
+                Question.objects.create(meeting=meeting, text=text, user=request.user)
         else:
             history = list(
                 ChatMessage.objects.filter(meeting=meeting, user=request.user)
@@ -220,9 +220,12 @@ def _require_host(meeting, user):
 
 @login_required
 def inbox(request, meeting_id):
+    # 주최자는 받은 질문 전체(작성자 비공개)를 보고 답한다. 팀원은 본인이 보낸 질문과
+    # 그 답변만 볼 수 있다 — 익명이라는 취지상 다른 사람이 받은 답은 보이면 안 된다.
     meeting = _meeting(request, meeting_id)
-    _require_host(meeting, request.user)
-    return render(request, "meetalign/inbox.html", {"meeting": meeting, "questions": meeting.questions.all()})
+    is_host = meeting.host_id == request.user.id
+    questions = meeting.questions.all() if is_host else meeting.questions.filter(user=request.user)
+    return render(request, "meetalign/inbox.html", {"meeting": meeting, "questions": questions, "is_host": is_host})
 
 
 @login_required

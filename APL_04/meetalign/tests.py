@@ -297,14 +297,43 @@ class PrototypeFlowTests(TestCase):
         self.client.post(reverse("meeting_create", args=[self.team.id]), {"title": "h"})
         self.assertEqual(Meeting.objects.get(title="h").host, self.user)
 
-    def test_non_host_cannot_open_inbox_or_answer(self):
+    def test_non_host_can_view_inbox_but_not_answer(self):
         member = self._member_client()
-        self.assertEqual(member.get(reverse("inbox", args=[self.meeting.id])).status_code, 403)
+        self.assertEqual(member.get(reverse("inbox", args=[self.meeting.id])).status_code, 200)
         q = Question.objects.create(meeting=self.meeting, text="why?")
         r = member.post(reverse("answers", args=[self.meeting.id]), {"question_id": q.id, "answer": "x"})
         self.assertEqual(r.status_code, 403)
         q.refresh_from_db()
         self.assertEqual(q.answer, "")
+
+    def test_asker_sees_only_their_own_question_and_answer(self):
+        member_user = User.objects.create_user("member", password="pw12345!")
+        self.team.members.add(member_user)
+        member = Client()
+        member.force_login(member_user)
+
+        other_user = User.objects.create_user("c", password="pw12345!")
+        self.team.members.add(other_user)
+        other = Client()
+        other.force_login(other_user)
+
+        Question.objects.create(meeting=self.meeting, text="내 질문", answer="주최자 답변", user=member_user)
+        Question.objects.create(meeting=self.meeting, text="다른 사람 질문", answer="다른 답변", user=other_user)
+
+        r = member.get(reverse("inbox", args=[self.meeting.id]))
+        self.assertContains(r, "내 질문")
+        self.assertContains(r, "주최자 답변")
+        self.assertNotContains(r, "다른 사람 질문")
+
+        r2 = other.get(reverse("inbox", args=[self.meeting.id]))
+        self.assertContains(r2, "다른 사람 질문")
+        self.assertNotContains(r2, "내 질문")
+
+    def test_host_sees_all_questions_regardless_of_asker(self):
+        member = self._member_client()
+        member.post(reverse("chat", args=[self.meeting.id]), {"mode": "anon", "text": "팀원 질문"})
+        r = self.client.get(reverse("inbox", args=[self.meeting.id]))
+        self.assertContains(r, "팀원 질문")
 
     def test_meeting_without_host_stays_open_to_members(self):
         self.meeting.host = None
@@ -316,12 +345,12 @@ class PrototypeFlowTests(TestCase):
         member = self._member_client()
         member.post(reverse("chat", args=[self.meeting.id]), {"mode": "anon", "text": "hi"})
         self.assertEqual(Question.objects.filter(meeting=self.meeting).count(), 1)
+        self.assertEqual(Question.objects.get().user.username, "member")
 
-    def test_non_host_does_not_see_inbox_link_that_would_403(self):
+    def test_inbox_link_visible_to_everyone(self):
         member = self._member_client()
         r = member.get(reverse("meeting_detail", args=[self.meeting.id]))
-        self.assertNotContains(r, reverse("inbox", args=[self.meeting.id]))
-        self.assertContains(r, reverse("chat", args=[self.meeting.id]))
+        self.assertContains(r, reverse("inbox", args=[self.meeting.id]))
 
     def test_host_sees_inbox_link(self):
         r = self.client.get(reverse("meeting_detail", args=[self.meeting.id]))

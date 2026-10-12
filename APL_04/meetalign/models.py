@@ -92,8 +92,10 @@ class ChatMessage(models.Model):
 
 
 class Question(models.Model):
-    """회의별 대화방의 익명 질문. 작성자는 저장하지 않는다."""
+    """회의별 대화방의 익명 질문. 주최자와 다른 팀원에게는 작성자를 보여주지 않지만,
+    답변을 본인만 볼 수 있도록 내부적으로는 작성자를 저장한다."""
     meeting = models.ForeignKey(Meeting, on_delete=models.CASCADE, related_name="questions")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="questions")
     text = models.TextField()
     answer = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
