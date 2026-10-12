@@ -597,6 +597,18 @@ class SecurityFixTests(TestCase):
             self.assertContains(r, "마감일 형식이 올바르지 않습니다.")
         self.assertFalse(Meeting.objects.filter(title="bad").exists())
 
+    def test_past_deadline_is_rejected_with_message(self):
+        past = (timezone.localdate() - timedelta(days=1)).isoformat()
+        r = self.client.post(reverse("meeting_create", args=[self.team.id]), {"title": "bad", "deadline": past})
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, "마감일은 오늘 이후 날짜로 설정해주세요.")
+        self.assertFalse(Meeting.objects.filter(title="bad").exists())
+
+    def test_todays_date_is_accepted_as_deadline(self):
+        today = timezone.localdate().isoformat()
+        self.client.post(reverse("meeting_create", args=[self.team.id]), {"title": "due-today", "deadline": today})
+        self.assertEqual(str(Meeting.objects.get(title="due-today").deadline), today)
+
     @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
     def test_unsupported_recording_format_is_rejected(self):
         file = SimpleUploadedFile("evil.exe", b"MZ", content_type="application/octet-stream")

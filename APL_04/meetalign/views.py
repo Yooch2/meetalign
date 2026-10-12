@@ -8,6 +8,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django.utils.http import url_has_allowed_host_and_scheme
 
@@ -104,6 +105,8 @@ def _parse_deadline(raw):
         parsed = None
     if parsed is None:
         return None, "마감일 형식이 올바르지 않습니다."
+    if parsed < timezone.localdate():
+        return None, "마감일은 오늘 이후 날짜로 설정해주세요."
     return parsed, None
 
 
