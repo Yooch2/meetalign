@@ -617,6 +617,13 @@ class SecurityFixTests(TestCase):
         self.meeting.refresh_from_db()
         self.assertFalse(Recording.objects.filter(meeting=self.meeting).exists())
 
+    @override_settings(MEDIA_ROOT=tempfile.mkdtemp(), BACKGROUND_RECORDING=False)
+    def test_additional_audio_video_formats_are_accepted(self):
+        for name in ["a.aac", "a.wma", "a.opus", "a.amr", "a.caf", "a.avi", "a.mov", "a.mkv", "a.3gp"]:
+            file = SimpleUploadedFile(name, b"data", content_type="application/octet-stream")
+            r = self.client.post(reverse("meeting_detail", args=[self.meeting.id]), {"action": "submit", "recording": file})
+            self.assertEqual(r.status_code, 302, name)
+
     @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
     def test_oversized_recording_is_rejected(self):
         file = SimpleUploadedFile("a.wav", b"RIFF", content_type="audio/wav")
