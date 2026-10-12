@@ -267,6 +267,16 @@ class PrototypeFlowTests(TestCase):
         member.post(reverse("chat", args=[self.meeting.id]), {"mode": "anon", "text": "hi"})
         self.assertEqual(Question.objects.filter(meeting=self.meeting).count(), 1)
 
+    def test_non_host_does_not_see_inbox_link_that_would_403(self):
+        member = self._member_client()
+        r = member.get(reverse("meeting_detail", args=[self.meeting.id]))
+        self.assertNotContains(r, reverse("inbox", args=[self.meeting.id]))
+        self.assertContains(r, reverse("chat", args=[self.meeting.id]))
+
+    def test_host_sees_inbox_link(self):
+        r = self.client.get(reverse("meeting_detail", args=[self.meeting.id]))
+        self.assertContains(r, reverse("inbox", args=[self.meeting.id]))
+
     def test_chat_conversation_is_isolated_per_user(self):
         member = self._member_client()
         self.client.post(reverse("chat", args=[self.meeting.id]), {"mode": "llm", "text": "내 질문"})
