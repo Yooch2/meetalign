@@ -14,7 +14,10 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from . import services, tasks
 from .models import Answer, ChatMessage, CheckQuestion, Meeting, Question, Recording, Team
 
-ALLOWED_RECORDING_EXTENSIONS = {".mp3", ".m4a", ".wav", ".ogg", ".webm", ".mp4", ".flac"}
+ALLOWED_RECORDING_EXTENSIONS = {
+    ".mp3", ".m4a", ".wav", ".ogg", ".webm", ".mp4", ".flac",
+    ".aac", ".wma", ".opus", ".amr", ".caf", ".avi", ".mov", ".mkv", ".3gp",
+}
 MAX_RECORDING_BYTES = 500 * 1024 * 1024
 
 
@@ -109,7 +112,7 @@ def _parse_deadline(raw):
 
 def _recording_error(recording):
     if os.path.splitext(recording.name)[1].lower() not in ALLOWED_RECORDING_EXTENSIONS:
-        return "지원하지 않는 녹음 형식입니다 (mp3, m4a, wav, ogg, webm, mp4, flac)."
+        return "지원하지 않는 녹음 형식입니다 (" + ", ".join(sorted(ext.lstrip(".") for ext in ALLOWED_RECORDING_EXTENSIONS)) + ")."
     if recording.size > MAX_RECORDING_BYTES:
         return "녹음 파일이 너무 큽니다 (500MB 이하만 가능)."
     return None
