@@ -61,7 +61,8 @@ def _generate_clean(prompt, retries=1, temperature=None):
 
 def _parse_mcq_json(raw):
     """LLM이 낸 JSON 배열을 파싱한다. 코드블록 표시나 설명이 섞여 나와도 JSON 배열
-    부분만 추출을 시도한다. 형식이 안 맞는 문항은 버리고, 하나도 없으면 빈 리스트를 반환한다."""
+    부분만 추출을 시도한다. 형식이 안 맞는 문항(보기 4개가 아니거나, 보기 중 서로
+    겹치는 게 있거나 등)은 버리고, 하나도 없으면 빈 리스트를 반환한다."""
     match = re.search(r"\[.*\]", raw, re.DOTALL)
     if not match:
         return []
@@ -80,7 +81,10 @@ def _parse_mcq_json(raw):
             evidence = str(item.get("evidence", "")).strip()
         except (KeyError, TypeError, ValueError):
             continue
-        if not text or len(choices) != 4 or any(not c for c in choices) or not (0 <= correct_choice < 4):
+        if (
+            not text or len(choices) != 4 or any(not c for c in choices)
+            or len(set(choices)) != 4 or not (0 <= correct_choice < 4)
+        ):
             continue
         questions.append({"text": text, "choices": choices, "correct_choice": correct_choice, "evidence": evidence})
     return questions

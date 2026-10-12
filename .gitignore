@@ -21,6 +21,9 @@ local_settings.py
 media/
 staticfiles/
 
+# Local test fixtures (large binary files, not for git)
+fixtures/
+
 # Environment variables / secrets
 .env
 .env.*
